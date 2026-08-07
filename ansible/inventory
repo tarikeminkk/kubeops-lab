@@ -1,0 +1,21 @@
+[git]
+tarik-git01 ansible_host=192.168.5.2
+
+[ci]
+tarik-ci01 ansible_host=192.168.5.1
+
+[registry]
+tarik-reg01 ansible_host=192.168.5.8
+
+[k8s_control_plane]
+tarik-k8s-cp01 ansible_host=192.168.5.3
+
+[k8s_workers]
+tarik-k8s-wrk01 ansible_host=192.168.5.4
+tarik-k8s-wrk02 ansible_host=192.168.5.5
+
+[monitoring]
+tarik-monitor01 ansible_host=192.168.5.6
+
+[all:vars]
+ansible_user=opsadmin

@@ -1,0 +1,35 @@
+---
+- name: KubeOps Base Server Setup
+  hosts: all
+  become: true
+
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - unzip
+          - jq
+          - tree
+        state: present
+
+    - name: Install chrony
+      apt:
+        name: chrony
+        state: present
+
+    - name: Ensure chrony is running
+      service:
+        name: chrony
+        state: started
+        enabled: true
