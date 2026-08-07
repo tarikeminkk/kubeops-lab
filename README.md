@@ -4,12 +4,6 @@ Production-inspired DevOps laboratory environment built on Nutanix AHV.
 
 The project focuses on infrastructure automation, configuration management, CI/CD, containerization, Kubernetes and monitoring.
 
-# KubeOps Lab
-
-Production-inspired DevOps laboratory environment built on Nutanix AHV.
-
-The project focuses on infrastructure automation, configuration management, CI/CD, containerization, Kubernetes and monitoring.
-
 ## Architecture
 
 ```text
