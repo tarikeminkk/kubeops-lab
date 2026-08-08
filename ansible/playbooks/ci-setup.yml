@@ -20,6 +20,7 @@
           - ca-certificates
           - gnupg
           - apt-transport-https
+          - ansible
         state: present
 
     - name: Install Java
