@@ -1,0 +1,44 @@
+---
+- name: Configure Alertmanager
+  hosts: monitoring
+  become: true
+
+  tasks:
+
+    - name: Install Alertmanager
+      apt:
+        name: prometheus-alertmanager
+        state: present
+        update_cache: true
+
+    - name: Configure Alertmanager
+      copy:
+        dest: /etc/prometheus/alertmanager.yml
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          global:
+            resolve_timeout: 5m
+
+          route:
+            receiver: 'default'
+            group_by:
+              - alertname
+            group_wait: 10s
+            group_interval: 1m
+            repeat_interval: 4h
+
+          receivers:
+            - name: 'default'
+
+    - name: Enable and start Alertmanager
+      systemd:
+        name: prometheus-alertmanager
+        enabled: true
+        state: restarted
+
+    - name: Verify Alertmanager
+      uri:
+        url: http://127.0.0.1:9093/-/ready
+        status_code: 200
