@@ -1,0 +1,56 @@
+---
+- name: Initialize Kubernetes Control Plane
+  hosts: k8s_control_plane
+  become: true
+
+  tasks:
+
+    - name: Check if Kubernetes cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubernetes_initialized
+
+    - name: Initialize Kubernetes control plane
+      command: >
+        kubeadm init
+        --apiserver-advertise-address=192.168.5.3
+        --pod-network-cidr=10.244.0.0/16
+      when: not kubernetes_initialized.stat.exists
+
+    - name: Create kubeconfig directory for opsadmin
+      file:
+        path: /home/opsadmin/.kube
+        state: directory
+        owner: opsadmin
+        group: opsadmin
+        mode: '0755'
+
+    - name: Copy Kubernetes admin config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/opsadmin/.kube/config
+        remote_src: true
+        owner: opsadmin
+        group: opsadmin
+        mode: '0600'
+
+    - name: Generate worker join command
+      command: kubeadm token create --print-join-command
+      register: kubernetes_join_command
+      changed_when: false
+
+
+- name: Join Kubernetes Workers
+  hosts: k8s_workers
+  become: true
+
+  tasks:
+
+    - name: Check if worker already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: worker_joined
+
+    - name: Join worker to Kubernetes cluster
+      command: "{{ hostvars[groups['k8s_control_plane'][0]]['kubernetes_join_command']['stdout'] }}"
+      when: not worker_joined.stat.exists

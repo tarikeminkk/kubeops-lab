@@ -64,6 +64,18 @@ pipeline {
                 '''
             }
         }
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+
+                    kubectl set image deployment/demo-app \
+                      demo-app=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+
+                    kubectl rollout status deployment/demo-app --timeout=120s
+                '''
+            }
+        }
     }
 
     post {

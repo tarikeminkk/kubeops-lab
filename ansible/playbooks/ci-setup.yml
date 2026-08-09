@@ -133,7 +133,38 @@
         mode: '0644'
       notify: Restart Docker
 
+    - name: Create Kubernetes keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Kubernetes repository key
+      get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key
+        dest: /tmp/kubernetes-release.key
+        mode: '0644'
+
+    - name: Install Kubernetes repository key
+      shell: |
+        gpg --dearmor --yes \
+          -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+          /tmp/kubernetes-release.key
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /"
+        state: present
+        filename: kubernetes
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+        update_cache: true
+
   handlers:
+
     - name: Restart Docker
       systemd:
         name: docker

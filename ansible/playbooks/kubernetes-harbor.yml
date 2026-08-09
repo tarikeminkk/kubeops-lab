@@ -1,0 +1,40 @@
+---
+- name: Configure Kubernetes nodes for Harbor registry
+  hosts: k8s_control_plane,k8s_workers
+  become: true
+
+  tasks:
+
+    - name: Create Harbor certs directory for containerd
+      file:
+        path: /etc/containerd/certs.d/harbor.kubeops.local
+        state: directory
+        mode: '0755'
+
+    - name: Configure Harbor HTTP registry
+      copy:
+        dest: /etc/containerd/certs.d/harbor.kubeops.local/hosts.toml
+        content: |
+          server = "http://harbor.kubeops.local"
+
+          [host."http://harbor.kubeops.local"]
+            capabilities = ["pull", "resolve"]
+        mode: '0644'
+
+    - name: Enable containerd registry config path
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: 'config_path = ""'
+        replace: 'config_path = "/etc/containerd/certs.d"'
+
+    - name: Enable local image pull mode for containerd CRI
+      lineinfile:
+        path: /etc/containerd/config.toml
+        insertafter: "\\[plugins\\.'io.containerd.cri.v1.images'\\]"
+        regexp: '^    use_local_image_pull ='
+        line: '    use_local_image_pull = true'
+
+    - name: Restart containerd
+      systemd:
+        name: containerd
+        state: restarted
