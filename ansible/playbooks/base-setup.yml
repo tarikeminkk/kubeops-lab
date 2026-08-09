@@ -37,3 +37,10 @@
     - name: Set timezone to Europe/Istanbul
       community.general.timezone:
         name: Europe/Istanbul
+
+    - name: Add Harbor hostname
+      lineinfile:
+        path: /etc/hosts
+        line: "192.168.5.8 harbor.kubeops.local"
+        state: present 
+  
