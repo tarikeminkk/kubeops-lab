@@ -120,3 +120,21 @@
         name: jenkins
         groups: docker
         append: true
+
+    - name: Configure Harbor as insecure Docker registry
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "insecure-registries": ["harbor.kubeops.local"]
+          }
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Docker
+
+  handlers:
+    - name: Restart Docker
+      systemd:
+        name: docker
+        state: restarted
