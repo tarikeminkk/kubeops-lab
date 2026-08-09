@@ -1,0 +1,82 @@
+---
+- name: Configure Monitoring Server
+  hosts: monitoring
+  become: true
+
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - gpg
+          - ca-certificates
+          - prometheus
+          - prometheus-node-exporter
+        state: present
+
+    - name: Enable and start Prometheus
+      systemd:
+        name: prometheus
+        enabled: true
+        state: started
+
+    - name: Enable and start Node Exporter
+      systemd:
+        name: prometheus-node-exporter
+        enabled: true
+        state: started
+
+    - name: Create Grafana keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Grafana GPG key
+      get_url:
+        url: https://apt.grafana.com/gpg.key
+        dest: /tmp/grafana.key
+        mode: '0644'
+
+    - name: Install Grafana GPG key
+      shell: |
+        gpg --dearmor --yes \
+          -o /etc/apt/keyrings/grafana.gpg \
+          /tmp/grafana.key
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+        state: present
+        filename: grafana
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: true
+
+    - name: Enable and start Grafana
+      systemd:
+        name: grafana-server
+        enabled: true
+        state: started
+
+    - name: Verify monitoring services
+      shell: |
+        systemctl is-active prometheus
+        systemctl is-active prometheus-node-exporter
+        systemctl is-active grafana-server
+      register: monitoring_status
+      changed_when: false
+
+    - name: Display monitoring service status
+      debug:
+        var: monitoring_status.stdout_lines

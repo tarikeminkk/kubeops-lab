@@ -1,0 +1,78 @@
+---
+- name: Configure Prometheus Targets
+  hosts: monitoring
+  become: true
+
+  tasks:
+
+    - name: Configure Prometheus
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+
+          scrape_configs:
+
+            - job_name: 'prometheus'
+              static_configs:
+                - targets:
+                    - 'localhost:9090'
+
+            - job_name: 'kubeops-nodes'
+              static_configs:
+                - targets:
+                    - '192.168.5.1:9100'
+                  labels:
+                    server: 'tarik-ci01'
+
+                - targets:
+                    - '192.168.5.2:9100'
+                  labels:
+                    server: 'tarik-git01'
+
+                - targets:
+                    - '192.168.5.3:9100'
+                  labels:
+                    server: 'tarik-k8s-cp01'
+
+                - targets:
+                    - '192.168.5.4:9100'
+                  labels:
+                    server: 'tarik-k8s-wrk01'
+
+                - targets:
+                    - '192.168.5.5:9100'
+                  labels:
+                    server: 'tarik-k8s-wrk02'
+
+                - targets:
+                    - '192.168.5.6:9100'
+                  labels:
+                    server: 'tarik-monitor01'
+
+                - targets:
+                    - '192.168.5.8:9100'
+                  labels:
+                    server: 'tarik-reg01'
+
+            - job_name: 'kube-state-metrics'
+              static_configs:
+                - targets:
+                    - '192.168.5.4:31410'
+                  labels:
+                    cluster: 'kubeops'
+
+    - name: Validate Prometheus configuration
+      command: promtool check config /etc/prometheus/prometheus.yml
+      changed_when: false
+
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+        enabled: true
