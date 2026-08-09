@@ -1,0 +1,44 @@
+---
+- name: Install Harbor Registry
+  hosts: registry
+  become: true
+
+  vars:
+    harbor_version: "2.13.1"
+    harbor_install_dir: "/opt/harbor"
+
+  tasks:
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - tar
+        state: present
+        update_cache: true
+
+    - name: Create Harbor install directory
+      file:
+        path: "{{ harbor_install_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Harbor offline installer
+      get_url:
+        url: "https://github.com/goharbor/harbor/releases/download/v{{ harbor_version }}/harbor-offline-installer-v{{ harbor_version }}.tgz"
+        dest: "/tmp/harbor-offline-installer.tgz"
+        mode: '0644'
+
+    - name: Extract Harbor installer
+      unarchive:
+        src: "/tmp/harbor-offline-installer.tgz"
+        dest: "/opt"
+        remote_src: true
+        creates: "/opt/harbor/install.sh"
+
+    - name: Copy Harbor configuration template
+      copy:
+        src: "/opt/harbor/harbor.yml.tmpl"
+        dest: "/opt/harbor/harbor.yml"
+        remote_src: true
+        force: false

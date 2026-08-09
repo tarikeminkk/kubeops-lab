@@ -1,0 +1,35 @@
+---
+- name: Configure Harbor
+  hosts: registry
+  become: true
+
+  tasks:
+
+    - name: Set Harbor hostname
+      lineinfile:
+        path: /opt/harbor/harbor.yml
+        regexp: '^hostname:'
+        line: 'hostname: harbor.kubeops.local'
+
+    - name: Set Harbor HTTP port
+      lineinfile:
+        path: /opt/harbor/harbor.yml
+        regexp: '^  port: 80$'
+        line: '  port: 80'
+        insertafter: '^http:'
+
+    - name: Disable Harbor HTTPS configuration
+      replace:
+        path: /opt/harbor/harbor.yml
+        regexp: '(?ms)^https:\n.*?^  private_key:.*\n'
+        replace: ''
+
+    - name: Verify Harbor configuration
+      shell: |
+        grep -A6 -E '^(hostname:|http:|https:)' /opt/harbor/harbor.yml
+      register: harbor_config
+      changed_when: false
+
+    - name: Display Harbor configuration
+      debug:
+        var: harbor_config.stdout_lines
