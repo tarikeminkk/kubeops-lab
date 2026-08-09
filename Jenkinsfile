@@ -76,6 +76,27 @@ pipeline {
                 '''
             }
         }
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+
+                    kubectl get pods -l app=demo-app
+
+                    READY_PODS=$(kubectl get pods -l app=demo-app \
+                      --field-selector=status.phase=Running \
+                      --no-headers | wc -l)
+
+                    if [ "$READY_PODS" -lt 2 ]; then
+                        echo "Expected 2 running demo-app pods, found $READY_PODS"
+                        exit 1
+                    fi
+
+                    curl --fail --retry 5 --retry-delay 3 \
+                      http://192.168.5.4:30080/
+                '''
+            }
+        }
     }
 
     post {
