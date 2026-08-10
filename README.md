@@ -301,3 +301,4 @@ kubeops-lab/
 ├── Jenkinsfile
 └── README.md
 ```
+This project is actively being developed and expanded.
