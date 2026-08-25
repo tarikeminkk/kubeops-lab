@@ -64,44 +64,43 @@ pipeline {
                 '''
             }
         }
-        stage('Deploy to Kubernetes') {
+
+        stage('Update GitOps Manifest') {
             steps {
-                sh '''
-                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-kubeops',
+                        usernameVariable: 'GIT_USER',
+                        passwordVariable: 'GIT_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        sed -i "s#image: ${REGISTRY}/${IMAGE_NAME}:.*#image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}#" \
+                          kubernetes/deployment.yaml
 
-                    kubectl set image deployment/demo-app \
-                      demo-app=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        git config user.name "KubeOps Jenkins"
+                        git config user.email "jenkins@kubeops.local"
 
-                    kubectl rollout status deployment/demo-app --timeout=120s
-                '''
-            }
-        }
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                        git add kubernetes/deployment.yaml
 
-                    kubectl get pods -l app=demo-app
+                        if git diff --cached --quiet; then
+                            echo "No manifest changes detected."
+                        else
+                            git commit -m "deploy: update demo-app image to ${IMAGE_TAG}"
 
-                    READY_PODS=$(kubectl get pods -l app=demo-app \
-                      --field-selector=status.phase=Running \
-                      --no-headers | wc -l)
-
-                    if [ "$READY_PODS" -lt 2 ]; then
-                        echo "Expected 2 running demo-app pods, found $READY_PODS"
-                        exit 1
-                    fi
-
-                    curl --fail --retry 5 --retry-delay 3 \
-                      http://192.168.5.4:30080/
-                '''
+                            git push \
+                              https://${GIT_USER}:${GIT_TOKEN}@github.com/tarikka0/kubeops-lab.git \
+                              HEAD:main
+                        fi
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'CI pipeline completed successfully.'
+            echo 'CI pipeline completed successfully. Deployment is managed by Argo CD.'
         }
 
         failure {
