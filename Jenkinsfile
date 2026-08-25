@@ -89,7 +89,7 @@ pipeline {
                             git commit -m "deploy: update demo-app image to ${IMAGE_TAG}"
 
                             git push \
-                              https://${GIT_USER}:${GIT_TOKEN}@github.com/tarikka0/kubeops-lab.git \
+                              https://${GIT_USER}:${GIT_TOKEN}@github.com/tarikeminkk/kubeops-lab.git \
                               HEAD:main
                         fi
                     '''
