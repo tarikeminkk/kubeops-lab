@@ -43,6 +43,14 @@
         name: loki
         state: present
 
+    - name: Create Loki data directory
+      file:
+        path: /var/lib/loki
+        state: directory
+        owner: loki
+        group: root
+        mode: '0755'
+
     - name: Configure Loki
       copy:
         dest: /etc/loki/config.yml
@@ -60,11 +68,11 @@
 
           common:
             instance_addr: 127.0.0.1
-            path_prefix: /tmp/loki
+            path_prefix: /var/lib/loki
             storage:
               filesystem:
-                chunks_directory: /tmp/loki/chunks
-                rules_directory: /tmp/loki/rules
+                chunks_directory: /var/lib/loki/chunks
+                rules_directory: /var/lib/loki/rules
             replication_factor: 1
             ring:
               kvstore:
@@ -95,7 +103,7 @@
             enabled: false
 
           ruler:
-            alertmanager_url: http://localhost:9093
+            alertmanager_url: http://192.168.5.6:9093
 
           frontend:
             encoding: protobuf
