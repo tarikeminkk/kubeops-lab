@@ -1,178 +1,137 @@
-# KubeOps Lab
+# End-to-End DevOps Infrastructure & GitOps Platform
 
-KubeOps Lab is a hands-on, production-inspired DevOps laboratory environment built on Nutanix AHV.
+A hands-on DevOps environment built on **Nutanix AHV-based private cloud infrastructure** to design and operate a complete software delivery and observability workflow.
 
-The project demonstrates infrastructure automation, CI/CD, private container image management, Kubernetes orchestration, GitOps-based continuous delivery, infrastructure monitoring, Kubernetes monitoring, and alerting across a multi-server Linux environment.
+The environment integrates infrastructure automation, CI, container image management, Kubernetes, GitOps-based deployment, metrics, alerting, and centralized logging.
 
-The complete application delivery workflow is automated from source-code changes to Kubernetes deployment.
+The goal of this project is not to demonstrate individual tools in isolation, but to integrate them into a working end-to-end platform.
 
 ---
 
 ## Architecture
 
-| Server | Role |
-| --- | --- |
-| `tarik-ops01` | Ansible Control Node / Git Client |
-| `tarik-git01` | Git Service |
-| `tarik-ci01` | Jenkins CI Server |
-| `tarik-reg01` | Harbor Container Registry |
-| `tarik-k8s-cp01` | Kubernetes Control Plane |
-| `tarik-k8s-wrk01` | Kubernetes Worker |
-| `tarik-k8s-wrk02` | Kubernetes Worker |
-| `tarik-monitor01` | Prometheus, Grafana and Alertmanager |
-
-All systems run as virtual machines in a Nutanix AHV lab environment.
-
-### Platform Architecture
-
 ```text
-                         GitHub
-                           |
-                           | SCM Polling
-                           v
-                        Jenkins
-                           |
-                +----------+----------+
-                |                     |
-                v                     v
-          Ansible Checks         Docker Build
-                                      |
-                                      v
-                              Harbor Registry
-                                      |
-                                      v
-                          GitOps Manifest Update
-                                      |
-                                      v
-                                   GitHub
-                                      |
-                                      v
-                                   Argo CD
-                                      |
-                                      v
-                                 Kubernetes
-                            +---------+---------+
-                            |                   |
-                            v                   v
-                    tarik-k8s-wrk01     tarik-k8s-wrk02
+                              GitHub
+                                 │
+                                 ▼
+                              Jenkins
+                                 │
+                         Build Docker Image
+                                 │
+                                 ▼
+                               Harbor
+                         Private Registry
+                                 │
+                                 │
+                    Update Kubernetes Manifest
+                                 │
+                                 ▼
+                              GitHub
+                                 │
+                                 ▼
+                              Argo CD
+                                 │
+                                 ▼
+                         Kubernetes Cluster
+                      ┌──────────┴──────────┐
+                      │                     │
+                 Control Plane          Workers
+                                      demo-app
+                                          │
+                                          ▼
+                                       Service
+
+
+                       OBSERVABILITY
+
+              ┌──────────── Metrics ─────────────┐
+              │                                  │
+        Node Exporter                   kube-state-metrics
+              │                                  │
+              └──────────► Prometheus ◄──────────┘
+                               │
+                               ▼
+                            Grafana
+
+                         Alert Rules
+                               │
+                               ▼
+                         Alertmanager
+
+
+                 CENTRALIZED LOGGING
+
+        Linux Servers                Kubernetes Pods
+             │                             │
+             ▼                             ▼
+        Grafana Alloy                 Grafana Alloy
+             │                             │
+             └──────────────┬──────────────┘
+                            ▼
+                           Loki
+                            │
+                            ▼
+                         Grafana
 ```
 
 ---
 
-## Technology Stack
+## Infrastructure
 
-- Nutanix AHV
-- Ubuntu Server
-- Git and GitHub
-- Ansible
-- Jenkins
-- Docker
-- Harbor
-- Kubernetes
-- Argo CD
-- NGINX
-- Prometheus
-- Grafana
-- Node Exporter
-- kube-state-metrics
-- Alertmanager
+The environment runs on Ubuntu Server virtual machines hosted on Nutanix AHV.
+
+| Host | IP Address | Role |
+|---|---|---|
+| `tarik-ci01` | `192.168.5.1` | Jenkins CI/CD |
+| `tarik-git01` | `192.168.5.2` | Git services |
+| `tarik-k8s-cp01` | `192.168.5.3` | Kubernetes control plane |
+| `tarik-k8s-wrk01` | `192.168.5.4` | Kubernetes worker |
+| `tarik-k8s-wrk02` | `192.168.5.5` | Kubernetes worker |
+| `tarik-monitor01` | `192.168.5.6` | Prometheus, Grafana, Alertmanager |
+| `tarik-ops01` | `192.168.5.7` | Ansible control node |
+| `tarik-reg01` | `192.168.5.8` | Harbor container registry |
+| `tarik-log01` | `192.168.5.9` | Loki centralized logging |
 
 ---
 
-## Infrastructure Automation
+## CI/CD and GitOps
 
-Ansible is used for configuration management and infrastructure automation.
-
-The control node manages the lab servers over SSH using a centralized inventory.
-
-```text
-ansible/
-├── inventory
-├── ansible.cfg
-└── playbooks/
-    ├── base-setup.yml
-    ├── ci-setup.yml
-    ├── registry-setup.yml
-    ├── harbor-setup.yml
-    ├── kubernetes-setup.yml
-    ├── kubernetes-cluster.yml
-    ├── kubernetes-harbor.yml
-    ├── monitoring-setup.yml
-    ├── node-exporter.yml
-    ├── prometheus-targets.yml
-    ├── alertmanager-setup.yml
-    └── prometheus-alerts.yml
-```
-
-Automation includes Linux base configuration, package management, Docker installation, Jenkins configuration, Harbor configuration, Kubernetes node preparation, cluster setup, monitoring deployment, Prometheus target configuration, and alerting.
-
-Before application images are built, Jenkins also performs Ansible syntax validation to verify the infrastructure automation code.
-
----
-
-## CI/CD Pipeline
-
-Application builds are handled through the repository `Jenkinsfile`.
-
-Jenkins monitors the `main` branch for source-code changes using SCM polling.
-
-When a new commit is detected, the pipeline starts automatically.
+Application delivery follows a GitOps workflow.
 
 ```text
 Developer
-   |
-   | git push
-   v
+   │
+   ▼
 GitHub
-   |
-   | SCM Polling
-   v
+   │
+   ▼
 Jenkins
-   |
-   +-- Ansible Syntax Check
-   |
-   +-- Docker Build
-   |
-   +-- Harbor Authentication
-   |
-   +-- Push Versioned Image
-   |
-   +-- Update Kubernetes Manifest
-   |
-   +-- Commit GitOps Change
-   |
-   v
-GitHub
+   │
+   ├── Validate automation
+   ├── Build Docker image
+   ├── Authenticate to Harbor
+   ├── Push versioned image
+   └── Update Kubernetes image tag in Git
+             │
+             ▼
+           GitHub
+             │
+             ▼
+           Argo CD
+             │
+             ▼
+         Kubernetes
 ```
 
-Each Jenkins build creates a versioned Docker image using the Jenkins build number.
+Jenkins is responsible for the CI portion of the workflow.
 
-Example:
+When a code change is detected, Jenkins builds a new Docker image and pushes both versioned and latest tags to the private Harbor registry.
 
-```text
-harbor.kubeops.local/kubeops/demo-app:60
-harbor.kubeops.local/kubeops/demo-app:latest
-```
+The pipeline then updates the image version in the Kubernetes deployment manifest and pushes the desired state back to Git.
 
-The versioned image is pushed to Harbor.
+Argo CD monitors the Git repository and synchronizes the Kubernetes cluster with the desired state stored in Git.
 
-After the image is successfully pushed, Jenkins updates the image tag inside:
-
-```text
-kubernetes/deployment.yaml
-```
-
-Jenkins then commits and pushes the manifest change back to the `main` branch.
-
-Example automated commit:
-
-```text
-deploy: update demo-app image to 60
-```
-
-This separates the **CI process** from the **deployment process**.
-
-Jenkins is responsible for building and publishing the application artifact, while Argo CD is responsible for deploying the desired state stored in Git.
+This keeps deployment responsibility outside Jenkins and makes Git the source of truth for the cluster state.
 
 ### Jenkins Pipeline
 
@@ -180,25 +139,26 @@ Jenkins is responsible for building and publishing the application artifact, whi
 
 ---
 
-## Container Registry
+## Private Container Registry
 
-Harbor is used as the private container registry.
+Harbor is used as the internal container image registry.
 
-Jenkins authenticates using a dedicated Harbor robot account and pushes versioned images generated by the pipeline.
-
-Example:
+Application images produced by Jenkins are stored as versioned artifacts before being pulled by Kubernetes.
 
 ```text
-harbor.kubeops.local/kubeops/demo-app:<build-number>
+Jenkins
+   │
+   ▼
+harbor.kubeops.local
+   │
+   ├── demo-app:<build-number>
+   └── demo-app:latest
+         │
+         ▼
+     Kubernetes
 ```
 
-A `latest` tag is also maintained.
-
-```text
-harbor.kubeops.local/kubeops/demo-app:latest
-```
-
-Kubernetes worker nodes are configured to pull application images from the internal Harbor registry.
+Jenkins authenticates to Harbor using a dedicated robot account rather than a personal user account.
 
 ### Harbor Registry
 
@@ -206,337 +166,192 @@ Kubernetes worker nodes are configured to pull application images from the inter
 
 ---
 
-## GitOps Continuous Delivery
-
-Argo CD provides the Continuous Delivery and GitOps layer of the project.
-
-The Kubernetes manifests stored in GitHub represent the desired state of the application.
-
-Argo CD monitors:
-
-```text
-Repository:
-https://github.com/tarikeminkk/kubeops-lab.git
-
-Branch:
-main
-
-Path:
-kubernetes
-```
-
-When Jenkins updates `kubernetes/deployment.yaml`, Argo CD detects the Git change and synchronizes the Kubernetes cluster automatically.
-
-The deployment flow is:
-
-```text
-Jenkins
-   |
-   | Build Image
-   v
-Harbor
-   |
-   | Update image tag
-   v
-kubernetes/deployment.yaml
-   |
-   | Git Commit + Push
-   v
-GitHub
-   |
-   | Detect Desired State Change
-   v
-Argo CD
-   |
-   | Automatic Sync
-   v
-Kubernetes
-```
-
-A successful deployment results in the Argo CD application reaching:
-
-```text
-Sync Status: Synced
-Health Status: Healthy
-```
-
-This implements a GitOps workflow where Git is the source of truth for Kubernetes deployments.
-
----
-
-## End-to-End CI/CD & GitOps Workflow
-
-The complete application delivery process is automated.
-
-```text
-Code Change
-    |
-    v
-Git Push
-    |
-    v
-GitHub
-    |
-    | SCM Polling
-    v
-Jenkins
-    |
-    +-- Ansible Syntax Check
-    |
-    +-- Docker Build
-    |
-    +-- Harbor Login
-    |
-    +-- Push Image
-    |
-    +-- Update deployment.yaml
-    |
-    +-- Git Commit / Push
-    |
-    v
-GitHub
-    |
-    v
-Argo CD
-    |
-    | Automatic Sync
-    v
-Kubernetes
-    |
-    v
-Rolling Update
-    |
-    v
-Running Application
-```
-
-The workflow was validated end-to-end by changing the demo application's HTML source and pushing the change to GitHub.
-
-Jenkins automatically detected the repository change, built a new Docker image, pushed it to Harbor, updated the Kubernetes manifest, and committed the new image version to Git.
-
-Argo CD then detected the desired-state change and deployed the new application version to Kubernetes.
-
----
-
 ## Kubernetes
 
-The Kubernetes cluster consists of one control-plane node and two worker nodes.
+The Kubernetes environment consists of one control-plane node and two worker nodes.
 
-```text
-             tarik-k8s-cp01
-              Control Plane
-                    |
-          +---------+---------+
-          |                   |
-          v                   v
- tarik-k8s-wrk01       tarik-k8s-wrk02
-      Worker                Worker
-```
+The sample application runs with multiple replicas and is exposed through a Kubernetes Service.
 
-The demo application runs with two replicas distributed across the worker nodes.
+The application deployment includes:
 
-Example:
+- Multiple pod replicas
+- Readiness probes
+- Liveness probes
+- Versioned container images
+- Private Harbor image pulls
+- GitOps-based deployment through Argo CD
 
-```text
-demo-app   -> tarik-k8s-wrk01
-demo-app   -> tarik-k8s-wrk02
-```
-
-The application is exposed through a NodePort service on port:
-
-```text
-30080
-```
-
-Kubernetes readiness and liveness probes are configured to verify application health.
-
-Rolling updates allow new application versions to be deployed while maintaining application availability.
+The container runtime is **containerd**.
 
 ---
 
-## Kubernetes RBAC
+## Infrastructure Automation
 
-A dedicated Kubernetes ServiceAccount was created for controlled deployment operations:
+Ansible is used from the dedicated operations node to configure and maintain the Linux infrastructure.
 
-```text
-jenkins-deployer
-```
+Automation covers tasks such as:
 
-A namespace-scoped Role and RoleBinding provide only the permissions required by the deployment workflow.
+- Base server configuration
+- Package installation
+- Common system configuration
+- Node Exporter deployment
+- Jenkins setup
+- Harbor setup
+- Kubernetes configuration
+- Monitoring configuration
+- Prometheus targets
+- Alertmanager
+- Loki
+- Grafana Alloy
 
-This demonstrates the principle of least privilege instead of providing unrestricted cluster administrator credentials.
-
-With the introduction of Argo CD, application deployment is managed through the GitOps workflow rather than direct manual Kubernetes changes.
-
----
-
-## Deployment Verification
-
-Deployment status can be verified directly from the Kubernetes control plane.
-
-Current application image:
-
-```bash
-kubectl get deployment demo-app \
--o jsonpath='{.spec.template.spec.containers[0].image}'; echo
-```
-
-Application pods:
-
-```bash
-kubectl get pods -l app=demo-app -o wide
-```
-
-Argo CD synchronization and health:
-
-```bash
-kubectl -n argocd get application kubeops-demo-app \
--o jsonpath='{.status.sync.status}{" | health="}{.status.health.status}{"\n"}'
-```
-
-Expected result:
+Current playbooks include:
 
 ```text
-Synced | health=Healthy
+ansible/playbooks/
+├── base-setup.yml
+├── ci-setup.yml
+├── registry-setup.yml
+├── harbor-setup.yml
+├── kubernetes-setup.yml
+├── kubernetes-cluster.yml
+├── kubernetes-harbor.yml
+├── monitoring-setup.yml
+├── node-exporter.yml
+├── prometheus-targets.yml
+├── alertmanager-setup.yml
+├── prometheus-alerts.yml
+├── loki-setup.yml
+└── alloy-setup.yml
 ```
-
-The application can also be verified over HTTP through the Kubernetes NodePort service.
 
 ---
 
 ## Monitoring
 
-Prometheus and Grafana are used for centralized infrastructure and Kubernetes monitoring.
+Prometheus provides centralized metrics collection for the infrastructure and Kubernetes environment.
 
-Node Exporter runs on the Linux servers and provides metrics such as:
+Metrics are collected from:
 
-- CPU utilization
-- Memory utilization
-- Root disk utilization
-- Network metrics
-- System load
-- Uptime
+- Linux servers through Node Exporter
+- Kubernetes through kube-state-metrics
+- Infrastructure and workload targets configured in Prometheus
 
-Prometheus collects these metrics from all monitored lab nodes.
+Grafana is used to visualize infrastructure and Kubernetes metrics.
 
-### Infrastructure Dashboard
+### Infrastructure Overview
 
-The custom Grafana infrastructure dashboard provides a single view of:
+![Infrastructure Dashboard](docs/images/grafana-infrastructure-dashboard.png)
 
-- Node UP / DOWN status
-- CPU usage
-- Memory usage
-- Root disk usage
-- 1-minute system load
-- Active alerts
+### Node Metrics
 
-![KubeOps Infrastructure Dashboard](docs/images/grafana-infrastructure-dashboard.png)
+![Node Dashboard](docs/images/grafana-node-dashboard.png)
 
-### Node Monitoring
+### Kubernetes Metrics
 
-Detailed system metrics can also be viewed using the Node Exporter dashboard.
-
-![Grafana Node Dashboard](docs/images/grafana-node-dashboard.png)
-
----
-
-## Kubernetes Monitoring
-
-`kube-state-metrics` is deployed inside the Kubernetes cluster.
-
-Prometheus collects Kubernetes object-state metrics including:
-
-- Nodes
-- Pods
-- Deployments
-- Namespaces
-- ReplicaSets
-- StatefulSets
-- Jobs
-- Persistent Volume Claims
-
-Grafana is used to visualize Kubernetes cluster and workload information.
-
-![Grafana Kubernetes Dashboard](docs/images/grafana-kubernetes-dashboard.png)
+![Kubernetes Dashboard](docs/images/grafana-kubernetes-dashboard.png)
 
 ---
 
 ## Alerting
 
-Prometheus alert rules are used to detect infrastructure and Kubernetes problems.
+Prometheus alert rules and Alertmanager provide infrastructure and workload availability monitoring.
 
-Implemented rules include:
-
-- `NodeDown`
-- `KubernetesPodNotRunning`
-
-Prometheus forwards firing alerts to Alertmanager.
-
-The `NodeDown` rule was tested by stopping Node Exporter on `tarik-git01`.
-
-Prometheus detected the target as unavailable, the alert moved from pending to firing, Alertmanager received the alert, and the Grafana infrastructure dashboard displayed both the node failure and active alert.
-
-![Grafana Node Down Alert](docs/images/grafana-node-down-alert.png)
-
-The alerting flow is:
+Implemented alerts include:
 
 ```text
-Node Exporter / kube-state-metrics
-              |
-              v
-          Prometheus
-              |
-          Alert Rules
-              |
-              v
-         Alertmanager
-              |
-              v
-            Grafana
+NodeDown
+KubernetesPodNotRunning
 ```
+
+`NodeDown` was tested by stopping Node Exporter on one of the monitored servers and verifying the complete alert lifecycle from Prometheus to Alertmanager and recovery.
+
+### NodeDown Test
+
+![NodeDown Alert](docs/images/grafana-node-down-alert.png)
 
 ---
 
-## Demo Application
+## Centralized Logging
 
-A lightweight NGINX container is used to validate the complete delivery workflow.
+Centralized logging is implemented using **Grafana Alloy, Loki, and Grafana**.
 
-The application source is stored under:
+Two different log sources are collected.
+
+### Linux System Logs
+
+Grafana Alloy runs on the Linux servers and reads logs from the systemd journal.
 
 ```text
-app/
-├── Dockerfile
-└── index.html
+Linux Server
+     │
+     ▼
+systemd journal
+     │
+     ▼
+Grafana Alloy
+     │
+     ▼
+Loki
+     │
+     ▼
+Grafana
 ```
 
-The application demonstrates that a source-code change can travel automatically through the complete DevOps toolchain.
+Logs can be filtered by host and other labels from Grafana Explore.
+
+Example:
+
+```logql
+{hostname="tarik-git01"}
+```
+
+![Linux Logs](docs/images/grafana-linux-logs.png)
+
+### Kubernetes Application Logs
+
+A dedicated Grafana Alloy instance runs inside Kubernetes and discovers workloads through the Kubernetes API.
+
+Pod logs are enriched with Kubernetes metadata before being forwarded to Loki.
+
+Available labels include:
 
 ```text
-HTML Change
-    |
-    v
-Git Push
-    |
-    v
-Jenkins
-    |
-    v
-Docker Image
-    |
-    v
-Harbor
-    |
-    v
-GitOps Manifest Update
-    |
-    v
-Argo CD
-    |
-    v
-Kubernetes
-    |
-    v
-2 Running Replicas
+cluster
+namespace
+pod
+container
+app
+```
+
+This makes it possible to isolate logs for a specific workload directly from Grafana.
+
+Example:
+
+```logql
+{namespace="default", container="demo-app"}
+```
+
+![Kubernetes Application Logs](docs/images/grafana-kubernetes-logs.png)
+
+The logging pipeline is:
+
+```text
+Kubernetes Pods
+      │
+      ▼
+Grafana Alloy
+      │
+      ▼
+Loki
+      │
+      ▼
+Grafana Explore
+```
+
+Loki runs on the dedicated logging server and stores its local TSDB, WAL, chunks, and related data under:
+
+```text
+/var/lib/loki
 ```
 
 ---
@@ -544,76 +359,97 @@ Kubernetes
 ## Repository Structure
 
 ```text
-kubeops-lab/
+.
 ├── ansible/
 │   ├── inventory
 │   ├── ansible.cfg
 │   └── playbooks/
+│
 ├── app/
-│   ├── Dockerfile
-│   └── index.html
+│
 ├── kubernetes/
 │   ├── deployment.yaml
-│   └── service.yaml
+│   ├── service.yaml
+│   └── alloy-logs.yaml
+│
 ├── docs/
 │   └── images/
+│
 ├── Jenkinsfile
 └── README.md
 ```
 
 ---
 
-## Key DevOps Practices Demonstrated
+## Technology Stack
 
-This lab demonstrates several practical DevOps concepts:
-
-- Infrastructure as Code with Ansible
-- Automated CI pipelines with Jenkins
-- Automated source-code change detection
-- Containerized application delivery with Docker
-- Private container image management with Harbor
-- Versioned container images
-- Kubernetes workload orchestration
-- Multi-node Kubernetes deployment
-- Kubernetes RBAC and least-privilege access
-- GitOps-based Continuous Delivery
-- Git as the source of truth
-- Automated synchronization with Argo CD
-- Kubernetes rolling updates
-- Infrastructure monitoring with Prometheus
-- Kubernetes monitoring with kube-state-metrics
-- Visualization with Grafana
-- Infrastructure and Kubernetes alerting
-- End-to-end automated application delivery
+| Area | Technologies |
+|---|---|
+| Virtualization | Nutanix AHV |
+| Operating System | Ubuntu Server |
+| Configuration Management | Ansible |
+| Source Control | Git, GitHub |
+| CI | Jenkins |
+| Containers | Docker |
+| Container Registry | Harbor |
+| Container Runtime | containerd |
+| Orchestration | Kubernetes |
+| GitOps / CD | Argo CD |
+| Metrics | Prometheus, Node Exporter, kube-state-metrics |
+| Visualization | Grafana |
+| Alerting | Alertmanager |
+| Logging | Loki, Grafana Alloy |
 
 ---
 
-## Project Status
+## What This Project Covers
 
-The core KubeOps Lab platform is operational.
+This environment demonstrates practical implementation of:
 
-Current implemented workflow:
+- Linux infrastructure administration
+- Infrastructure automation with Ansible
+- CI pipeline design
+- Docker image lifecycle management
+- Private container registry integration
+- Kubernetes cluster operations
+- GitOps deployment practices
+- Infrastructure and Kubernetes monitoring
+- Prometheus alerting
+- Centralized Linux logging
+- Kubernetes application logging
+- End-to-end integration between DevOps tools
+
+---
+
+## Current Delivery Flow
 
 ```text
 GitHub
    ↓
 Jenkins
    ↓
-Docker
+Docker Build
    ↓
 Harbor
    ↓
-GitOps Manifest Update
+Git Manifest Update
    ↓
 GitHub
    ↓
 Argo CD
    ↓
 Kubernetes
-   ↓
-Prometheus / Grafana / Alertmanager
 ```
 
-Application changes can now move from a Git commit to a running Kubernetes deployment through an automated CI/CD and GitOps workflow.
+## Current Observability Flow
 
-The environment serves as a hands-on platform for experimenting with production-inspired DevOps, Kubernetes, automation, monitoring, and GitOps practices.
+```text
+Metrics:
+Linux / Kubernetes → Prometheus → Grafana
+
+Logs:
+Linux / Kubernetes → Grafana Alloy → Loki → Grafana
+
+Alerts:
+Prometheus → Alertmanager
+```
