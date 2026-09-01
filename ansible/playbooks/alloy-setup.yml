@@ -1,0 +1,99 @@
+---
+- name: Install and configure Grafana Alloy
+  hosts:
+    - ci
+    - git
+    - registry
+    - monitoring
+    - logging
+    - k8s_control_plane
+    - k8s_workers
+  become: true
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - wget
+          - gnupg
+          - apt-transport-https
+        state: present
+        update_cache: true
+
+    - name: Create APT keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Grafana repository GPG key
+      get_url:
+        url: https://apt.grafana.com/gpg-full.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: '0644'
+
+    - name: Configure Grafana APT repository
+      copy:
+        dest: /etc/apt/sources.list.d/grafana.list
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main
+
+    - name: Update APT cache
+      apt:
+        update_cache: true
+
+    - name: Install Grafana Alloy
+      apt:
+        name: alloy
+        state: present
+
+    - name: Add Alloy user to systemd-journal group
+      user:
+        name: alloy
+        groups: systemd-journal
+        append: true
+
+    - name: Configure Grafana Alloy
+      copy:
+        dest: /etc/alloy/config.alloy
+        owner: root
+        group: alloy
+        mode: '0640'
+        content: |
+          loki.source.journal "system_logs" {
+            max_age    = "24h"
+            forward_to = [loki.write.local.receiver]
+
+            labels = {
+              hostname = "{{ inventory_hostname }}",
+            }
+          }
+
+          loki.write "local" {
+            endpoint {
+              url = "http://192.168.5.9:3100/loki/api/v1/push"
+            }
+          }
+
+    - name: Enable and restart Alloy
+      systemd:
+        name: alloy
+        enabled: true
+        state: restarted
+        daemon_reload: true
+
+    - name: Wait for Alloy service
+      pause:
+        seconds: 3
+
+    - name: Check Alloy service
+      command: systemctl is-active alloy
+      register: alloy_status
+      changed_when: false
+
+    - name: Display Alloy status
+      debug:
+        msg: "{{ inventory_hostname }} Alloy status: {{ alloy_status.stdout }}"

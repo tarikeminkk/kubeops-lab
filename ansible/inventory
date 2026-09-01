@@ -19,3 +19,7 @@ tarik-monitor01 ansible_host=192.168.5.6
 
 [all:vars]
 ansible_user=opsadmin
+
+[logging]
+tarik-log01 ansible_host=192.168.5.9
+

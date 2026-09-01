@@ -1,0 +1,128 @@
+---
+- name: Install and configure Loki
+  hosts: logging
+  become: true
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - wget
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Create APT keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Grafana repository GPG key
+      get_url:
+        url: https://apt.grafana.com/gpg-full.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: '0644'
+
+    - name: Configure Grafana APT repository
+      copy:
+        dest: /etc/apt/sources.list.d/grafana.list
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main
+
+    - name: Update APT cache
+      apt:
+        update_cache: true
+
+    - name: Install Loki
+      apt:
+        name: loki
+        state: present
+
+    - name: Configure Loki
+      copy:
+        dest: /etc/loki/config.yml
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          auth_enabled: false
+
+          server:
+            http_listen_port: 3100
+            grpc_listen_port: 9096
+            log_level: info
+            grpc_server_max_concurrent_streams: 1000
+
+          common:
+            instance_addr: 127.0.0.1
+            path_prefix: /tmp/loki
+            storage:
+              filesystem:
+                chunks_directory: /tmp/loki/chunks
+                rules_directory: /tmp/loki/rules
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+
+          query_range:
+            results_cache:
+              cache:
+                embedded_cache:
+                  enabled: true
+                  max_size_mb: 100
+
+          limits_config:
+            metric_aggregation_enabled: true
+            enable_multi_variant_queries: true
+
+          schema_config:
+            configs:
+              - from: 2020-10-24
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+          pattern_ingester:
+            enabled: false
+
+          ruler:
+            alertmanager_url: http://localhost:9093
+
+          frontend:
+            encoding: protobuf
+
+    - name: Enable and restart Loki
+      systemd:
+        name: loki
+        enabled: true
+        state: restarted
+        daemon_reload: true
+
+    - name: Wait for Loki port 3100
+      wait_for:
+        port: 3100
+        host: 127.0.0.1
+        timeout: 30
+
+    - name: Check Loki readiness endpoint
+      uri:
+        url: http://127.0.0.1:3100/ready
+        return_content: true
+        status_code: 200
+      register: loki_ready
+      retries: 10
+      delay: 5
+      until: loki_ready.status == 200
+
+    - name: Display Loki status
+      debug:
+        msg: "Loki status: {{ loki_ready.content }}"

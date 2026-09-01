@@ -60,6 +60,11 @@
                   labels:
                     server: 'tarik-reg01'
 
+                - targets:
+                    - '192.168.5.9:9100'
+                  labels:
+                    server: 'tarik-log01'
+  
             - job_name: 'kube-state-metrics'
               static_configs:
                 - targets:
