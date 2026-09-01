@@ -21,7 +21,7 @@ spec:
 
       containers:
         - name: demo-app
-          image: harbor.kubeops.local/kubeops/demo-app:61
+          image: harbor.kubeops.local/kubeops/demo-app:62
 
           ports:
             - containerPort: 80
