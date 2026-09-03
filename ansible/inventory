@@ -23,3 +23,5 @@ ansible_user=opsadmin
 [logging]
 tarik-log01 ansible_host=192.168.5.9
 
+[wazuh]
+tarik-wazuh01 ansible_host=192.168.5.10

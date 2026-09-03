@@ -1,0 +1,42 @@
+
+- name: Install Wazuh All-in-One
+  hosts: wazuh
+  become: true
+
+  tasks:
+    - name: Install curl and unzip
+      apt:
+        name:
+          - curl
+          - unzip
+        state: present
+        update_cache: yes
+
+    - name: Download Wazuh installation assistant
+      get_url:
+        url: https://packages.wazuh.com/4.14/wazuh-install.sh
+        dest: /tmp/wazuh-install.sh
+        mode: "0755"
+
+    - name: Install Wazuh All-in-One
+      command: bash /tmp/wazuh-install.sh -a
+      args:
+        creates: /var/ossec/bin/wazuh-control
+
+    - name: Enable Wazuh Dashboard
+      service:
+        name: wazuh-dashboard
+        enabled: yes
+        state: started
+
+    - name: Enable Wazuh Manager
+      service:
+        name: wazuh-manager
+        enabled: yes
+        state: started
+
+    - name: Enable Wazuh Indexer
+      service:
+        name: wazuh-indexer
+        enabled: yes
+        state: started

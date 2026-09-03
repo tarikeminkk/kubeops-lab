@@ -1,0 +1,49 @@
+---
+- name: Deploy Wazuh Agent
+  hosts:
+    - ci
+    - git
+    - registry
+    - monitoring
+    - logging
+    - k8s_control_plane
+    - k8s_workers
+  become: true
+
+  vars:
+    wazuh_manager: "192.168.5.10"
+    wazuh_agent_version: "4.14.7-1"
+    wazuh_agent_deb: "wazuh-agent_{{ wazuh_agent_version }}_amd64.deb"
+    wazuh_agent_url: "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/{{ wazuh_agent_deb }}"
+
+  tasks:
+    - name: Download Wazuh Agent package
+      ansible.builtin.get_url:
+        url: "{{ wazuh_agent_url }}"
+        dest: "/tmp/{{ wazuh_agent_deb }}"
+        mode: "0644"
+
+    - name: Install Wazuh Agent
+      ansible.builtin.apt:
+        deb: "/tmp/{{ wazuh_agent_deb }}"
+        state: present
+      environment:
+        WAZUH_MANAGER: "{{ wazuh_manager }}"
+        WAZUH_AGENT_NAME: "{{ inventory_hostname }}"
+
+    - name: Enable and start Wazuh Agent
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Verify Wazuh Agent is running
+      ansible.builtin.command:
+        cmd: systemctl is-active wazuh-agent
+      register: wazuh_agent_status
+      changed_when: false
+
+    - name: Display Wazuh Agent status
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ wazuh_agent_status.stdout }}"

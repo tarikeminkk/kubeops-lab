@@ -1,8 +1,8 @@
 # End-to-End DevOps Infrastructure & GitOps Platform
 
-A hands-on DevOps environment built on **Nutanix AHV-based private cloud infrastructure** to design and operate a complete software delivery and observability workflow.
+A hands-on DevOps environment built on **Nutanix AHV-based private cloud infrastructure** to design and operate a complete software delivery, observability, and security monitoring workflow.
 
-The environment integrates infrastructure automation, CI, container image management, Kubernetes, GitOps-based deployment, metrics, alerting, and centralized logging.
+The environment integrates infrastructure automation, CI/CD, container image management, Kubernetes, GitOps-based deployment, metrics, alerting, centralized logging, and security monitoring.
 
 The goal of this project is not to demonstrate individual tools in isolation, but to integrate them into a working end-to-end platform.
 
@@ -72,6 +72,22 @@ The goal of this project is not to demonstrate individual tools in isolation, bu
                             │
                             ▼
                          Grafana
+
+
+                  SECURITY MONITORING
+
+                      Linux Servers
+                           │
+                      Wazuh Agents
+                           │
+                           ▼
+                      Wazuh Manager
+                           │
+                           ▼
+                      Wazuh Indexer
+                           │
+                           ▼
+                     Wazuh Dashboard
 ```
 
 ---
@@ -91,6 +107,7 @@ The environment runs on Ubuntu Server virtual machines hosted on Nutanix AHV.
 | `tarik-ops01` | `192.168.5.7` | Ansible control node |
 | `tarik-reg01` | `192.168.5.8` | Harbor container registry |
 | `tarik-log01` | `192.168.5.9` | Loki centralized logging |
+| `tarik-wazuh01` | `192.168.5.10` | Wazuh security monitoring |
 
 ---
 
@@ -203,6 +220,8 @@ Automation covers tasks such as:
 - Alertmanager
 - Loki
 - Grafana Alloy
+- Wazuh deployment
+- Wazuh agent deployment
 
 Current playbooks include:
 
@@ -221,7 +240,9 @@ ansible/playbooks/
 ├── alertmanager-setup.yml
 ├── prometheus-alerts.yml
 ├── loki-setup.yml
-└── alloy-setup.yml
+├── alloy-setup.yml
+├── wazuh-setup.yml
+└── wazuh-agent.yml
 ```
 
 ---
@@ -356,6 +377,76 @@ Loki runs on the dedicated logging server and stores its local TSDB, WAL, chunks
 
 ---
 
+## Security Monitoring
+
+Security monitoring is implemented using **Wazuh**.
+
+A dedicated Wazuh server provides centralized security event analysis, endpoint monitoring, File Integrity Monitoring, and Security Configuration Assessment for the Linux infrastructure.
+
+```text
+Linux Servers
+      │
+      │ Wazuh Agent
+      ▼
+tarik-wazuh01
+      │
+      ├── Wazuh Manager
+      ├── Wazuh Indexer
+      └── Wazuh Dashboard
+```
+
+Wazuh agents are deployed and managed across the infrastructure using Ansible.
+
+### Endpoint Monitoring
+
+Eight Linux servers are connected to the Wazuh manager and centrally monitored from the Wazuh Dashboard.
+
+![Wazuh Endpoints](docs/images/wazuh-endpoints.png)
+
+### SSH Authentication Detection
+
+A controlled SSH authentication test was performed against `tarik-git01`.
+
+Wazuh detected and correlated:
+
+- Authentication attempts using a non-existent user
+- PAM authentication failures
+- Repeated password failures
+- Security alerts generated from repeated authentication failures
+
+![Wazuh SSH Detection](docs/images/wazuh-ssh-detection.png)
+
+### File Integrity Monitoring
+
+Wazuh File Integrity Monitoring was tested by modifying a monitored file under `/etc`.
+
+The agent detected the change in real time and generated an integrity checksum alert.
+
+```text
+/etc/wazuh-fim-test.conf
+        │
+        ▼
+   File Modified
+        │
+        ▼
+   Wazuh Agent
+        │
+        ▼
+ Integrity Alert
+```
+
+![Wazuh File Integrity Monitoring](docs/images/wazuh-file-integrity-monitoring.png)
+
+### Security Configuration Assessment
+
+Wazuh Security Configuration Assessment is used to evaluate Linux hosts against the **CIS Ubuntu Linux 24.04 LTS Benchmark**.
+
+The assessment provides visibility into passed, failed, and non-applicable security controls and can be used to identify potential system-hardening improvements.
+
+![Wazuh CIS Assessment](docs/images/wazuh-cis-assessment.png)
+
+---
+
 ## Repository Structure
 
 ```text
@@ -364,6 +455,22 @@ Loki runs on the dedicated logging server and stores its local TSDB, WAL, chunks
 │   ├── inventory
 │   ├── ansible.cfg
 │   └── playbooks/
+│       ├── base-setup.yml
+│       ├── ci-setup.yml
+│       ├── registry-setup.yml
+│       ├── harbor-setup.yml
+│       ├── kubernetes-setup.yml
+│       ├── kubernetes-cluster.yml
+│       ├── kubernetes-harbor.yml
+│       ├── monitoring-setup.yml
+│       ├── node-exporter.yml
+│       ├── prometheus-targets.yml
+│       ├── alertmanager-setup.yml
+│       ├── prometheus-alerts.yml
+│       ├── loki-setup.yml
+│       ├── alloy-setup.yml
+│       ├── wazuh-setup.yml
+│       └── wazuh-agent.yml
 │
 ├── app/
 │
@@ -374,6 +481,18 @@ Loki runs on the dedicated logging server and stores its local TSDB, WAL, chunks
 │
 ├── docs/
 │   └── images/
+│       ├── jenkins-pipeline.png
+│       ├── harbor-registry.png
+│       ├── grafana-infrastructure-dashboard.png
+│       ├── grafana-node-dashboard.png
+│       ├── grafana-kubernetes-dashboard.png
+│       ├── grafana-node-down-alert.png
+│       ├── grafana-linux-logs.png
+│       ├── grafana-kubernetes-logs.png
+│       ├── wazuh-endpoints.png
+│       ├── wazuh-ssh-detection.png
+│       ├── wazuh-file-integrity-monitoring.png
+│       └── wazuh-cis-assessment.png
 │
 ├── Jenkinsfile
 └── README.md
@@ -399,6 +518,7 @@ Loki runs on the dedicated logging server and stores its local TSDB, WAL, chunks
 | Visualization | Grafana |
 | Alerting | Alertmanager |
 | Logging | Loki, Grafana Alloy |
+| Security Monitoring | Wazuh |
 
 ---
 
@@ -417,7 +537,12 @@ This environment demonstrates practical implementation of:
 - Prometheus alerting
 - Centralized Linux logging
 - Kubernetes application logging
-- End-to-end integration between DevOps tools
+- Centralized endpoint security monitoring
+- SSH authentication event detection
+- File Integrity Monitoring
+- CIS-based Security Configuration Assessment
+- Automated security agent deployment with Ansible
+- End-to-end integration between DevOps, observability, and security tooling
 
 ---
 
@@ -452,4 +577,18 @@ Linux / Kubernetes → Grafana Alloy → Loki → Grafana
 
 Alerts:
 Prometheus → Alertmanager
+```
+
+## Current Security Monitoring Flow
+
+```text
+Linux Servers
+      ↓
+Wazuh Agents
+      ↓
+Wazuh Manager
+      ↓
+Wazuh Indexer
+      ↓
+Wazuh Dashboard
 ```
